@@ -14,9 +14,9 @@ api_v1 = NinjaAPI(urls_namespace="rems_api_v1", version="1.0.0")
 NOTE: Registration of endpoints here 👇
 """
 
-# from users.apis.api_v1 import router as users_router
+from company.apis.api_v1 import router as company_router
 
-# api_v1.add_router("/users", users_router, tags=["Users"])
+api_v1.add_router("company/", company_router, tags=["Company"])
 
 """
 NOTE: Registration of endpoints here 👆
