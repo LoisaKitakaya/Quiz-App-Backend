@@ -15,7 +15,7 @@ def contact_us(request, data: ContactForm):
             message=f"Hello Alex! A client has made contact with you. The client's name is: {data.first_name} {data.last_name}. Email address: {data.email}. The client's message is: '{data.message}'. Make sure the client is responded to.",
             from_email=settings.EMAIL_HOST_USER,
             recipient_list=[
-                # "agiebner10@gmail.com",
+                "agiebner10@gmail.com",
                 "kitakayaloisa@gmail.com",
             ],
             fail_silently=True,
