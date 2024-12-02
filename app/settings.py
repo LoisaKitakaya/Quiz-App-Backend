@@ -129,3 +129,24 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Email settings
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+
+EMAIL_HOST = "smtp.gmail.com"
+
+EMAIL_HOST_USER = os.getenv("EMAIL_ADDRESS")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_ADDRESS_PASSWORD")
+
+# Organization's proper name
+
+ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME")
+
+# App Servers
+
+FRONTEND_URL = os.getenv("FRONTEND_URL")

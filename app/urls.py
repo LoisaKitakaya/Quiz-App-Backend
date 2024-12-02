@@ -15,9 +15,15 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from .apis.api_v1 import api_v1
 from django.contrib import admin
-from django.urls import path
+from django.conf import settings
+from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/v1/", api_v1.urls),
 ]
+
+admin.site.site_header = f"{settings.ORGANIZATION_NAME} - Admin"
+admin.site.site_title = f"{settings.ORGANIZATION_NAME}"
