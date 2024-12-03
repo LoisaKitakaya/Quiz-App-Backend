@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "corsheaders",
     # my apps
     "users",
+    "quiz",
 ]
 
 MIDDLEWARE = [
