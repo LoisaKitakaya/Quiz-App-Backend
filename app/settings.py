@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     # 3rd party apps
     "corsheaders",
     # my apps
+    "users",
+    "quiz",
 ]
 
 MIDDLEWARE = [
@@ -107,6 +109,7 @@ DATABASES = {
     }
 }
 
+AUTH_USER_MODEL = "users.User"
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -177,3 +180,4 @@ ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME")
 # App Servers
 
 FRONTEND_URL = os.getenv("FRONTEND_URL")
+BACKEND_URL = os.getenv("BACKEND_URL")
