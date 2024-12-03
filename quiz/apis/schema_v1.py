@@ -1,6 +1,7 @@
 import uuid
-from ninja import Schema
+from ..models import Quiz
 from typing import Optional
+from ninja import Schema, ModelSchema
 
 
 class OptionSchema(Schema):
@@ -17,3 +18,12 @@ class QuestionSchema(Schema):
     rating_max: Optional[int] = None
     next_index: Optional[int] = None
     previous_index: Optional[int] = None
+
+
+class QuizSchema(ModelSchema):
+    class Meta:
+        model = Quiz
+        exclude = [
+            "created_at",
+            "updated_at",
+        ]

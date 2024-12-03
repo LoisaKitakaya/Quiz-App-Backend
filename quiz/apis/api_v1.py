@@ -1,8 +1,9 @@
 import uuid
+from typing import List
 from ninja import Router
 from ninja.errors import HttpError
-from .schema_v1 import QuestionSchema
-from ..models import Question, MultipleChoiceOption
+from .schema_v1 import QuestionSchema, QuizSchema
+from ..models import Question, MultipleChoiceOption, Quiz
 
 router = Router()
 
@@ -65,7 +66,17 @@ def get_question(request, quiz_id: str, question_index: int = 0):
 
     except IndexError:
         raise HttpError(404, "No more questions")
-    except Question.DoesNotExist:
-        raise HttpError(404, "Quiz or Question not found")
     except Exception as e:
-        raise HttpError(500, f"Unexpected error: {str(e)}")
+        raise HttpError(500, str(e))
+
+
+@router.get(
+    "",
+    response=List[QuizSchema],
+    description="Fetch all available quizzes.",
+)
+def get_quizzes(request):
+    try:
+        return list(Quiz.objects.filter(is_active=True))
+    except Exception as e:
+        raise HttpError(500, str(e))
