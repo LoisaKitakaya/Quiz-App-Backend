@@ -180,3 +180,4 @@ ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME")
 # App Servers
 
 FRONTEND_URL = os.getenv("FRONTEND_URL")
+BACKEND_URL = os.getenv("BACKEND_URL")

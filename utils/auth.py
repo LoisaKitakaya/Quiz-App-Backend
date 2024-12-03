@@ -14,7 +14,6 @@ def login_jwt(user: User) -> str | None:
                 "id": str(user.pk),
                 "username": user.username,
                 "email": user.email,
-                "role": user.role,
                 "is_staff": user.is_staff,
                 "expires": expiry_date.timestamp(),
             },
@@ -27,7 +26,7 @@ def login_jwt(user: User) -> str | None:
         raise Exception(str(e))
 
 
-def new_user_jwt(first_name, last_name, username, email, phone, password) -> str | None:
+def new_user_jwt(first_name, last_name, username, email, password) -> str | None:
     try:
         token = jwt.encode(
             {
@@ -35,7 +34,6 @@ def new_user_jwt(first_name, last_name, username, email, phone, password) -> str
                 "last_name": last_name,
                 "username": username,
                 "email": email,
-                "phone": phone,
                 "password": password,
             },
             settings.SECRET_KEY,

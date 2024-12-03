@@ -46,7 +46,6 @@ def new_user_signup(request, data: UserInputSchema):
             last_name=data.last_name,
             username=data.username,
             email=data.email,
-            phone=data.phone,
             password=data.password,
         )
 
@@ -78,10 +77,9 @@ def new_user_signup(request, data: UserInputSchema):
 )
 def complete_user_profile(request, data: UserInputSchema):
     try:
-        assert (
-            User.objects.filter(email=data.email).exists()
-            and User.objects.filter(username=data.username).exists()
-        )
+        user = User.objects.get(email=data.email)
+
+        assert User.objects.filter(email=data.email).exists()
 
         if len(data.password) <= 8:
             raise HttpError(
@@ -92,7 +90,10 @@ def complete_user_profile(request, data: UserInputSchema):
             raise HttpError(400, "Passwords provided did not match!")
 
         verification_token = new_user_jwt(
-            email=data.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username,
+            email=user.email,
             password=data.password,
         )
 
@@ -119,7 +120,7 @@ def complete_user_profile(request, data: UserInputSchema):
         raise HttpError(500, str(e))
 
 
-@router.post(
+@router.get(
     "/create-user",
     description="Create a user after email verification",
 )
@@ -152,7 +153,7 @@ def create__user(request, verification_token):
     return redirect(f"{settings.FRONTEND_URL}/auth/sign-in?verified=true")
 
 
-@router.post(
+@router.get(
     "/create-user-2",
     description="Create a user after email verification - for a user with an existing profile",
 )
@@ -295,7 +296,6 @@ def login_user(request, data: LoginUserSchema):
 
             return {
                 "token": auth_token,
-                "role": find_user.role,
                 "message": "Authentication successful",
             }
 
