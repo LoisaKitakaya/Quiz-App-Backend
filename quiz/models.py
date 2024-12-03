@@ -62,7 +62,7 @@ class Question(models.Model):
         editable=False,
     )
     quiz = models.ForeignKey(
-        "Quiz",
+        Quiz,
         on_delete=models.CASCADE,
         related_name="questions",
     )
@@ -114,7 +114,7 @@ class MultipleChoiceOption(models.Model):
         related_name="options",
         limit_choices_to={"question_type": Question.MULTIPLE_CHOICE},
     )
-    text = models.CharField(max_length=255)
+    text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -134,7 +134,7 @@ class Answer(models.Model):
         editable=False,
     )
     question = models.ForeignKey(
-        "Question",
+        Question,
         on_delete=models.CASCADE,
         related_name="answers",
     )

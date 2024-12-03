@@ -1,14 +1,15 @@
+import uuid
 from ninja import Schema
 from typing import Optional
 
 
 class OptionSchema(Schema):
-    id: int
+    id: uuid.UUID
     text: str
 
 
 class QuestionSchema(Schema):
-    id: int
+    id: uuid.UUID
     text: str
     question_type: str
     options: Optional[list[OptionSchema]] = None

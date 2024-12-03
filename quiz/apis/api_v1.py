@@ -1,3 +1,4 @@
+import uuid
 from ninja import Router
 from ninja.errors import HttpError
 from .schema_v1 import QuestionSchema
@@ -7,20 +8,22 @@ router = Router()
 
 
 @router.get(
-    "/questions/{quiz_id}/",
+    "/questions/{str:quiz_id}",
     response=QuestionSchema,
     description="Fetch a question by quiz ID and index.",
 )
-def get_question(request, quiz_id: int, question_index: int = 0):
+def get_question(request, quiz_id: str, question_index: int = 0):
     try:
-        questions_count = Question.objects.filter(quiz_id=quiz_id).count()
+        quiz_id = uuid.UUID(quiz_id)
 
-        if question_index >= questions_count or question_index < 0:
+        questions_count = Question.objects.filter(quiz__id=quiz_id).count()
+
+        if question_index > questions_count or question_index < 0:
             raise HttpError(404, "No more questions")
 
-        question = Question.objects.filter(quiz_id=quiz_id).order_by("id")[
-            question_index
-        ]
+        question = Question.objects.filter(
+            quiz__id=quiz_id, quiz__is_active=True
+        ).order_by("id")[question_index]
 
         options = (
             [
