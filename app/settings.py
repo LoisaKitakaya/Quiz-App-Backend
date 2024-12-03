@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     # 3rd party apps
     "corsheaders",
     # my apps
+    "users",
 ]
 
 MIDDLEWARE = [
@@ -107,6 +108,7 @@ DATABASES = {
     }
 }
 
+AUTH_USER_MODEL = "users.User"
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
