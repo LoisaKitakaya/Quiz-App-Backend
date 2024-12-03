@@ -15,8 +15,10 @@ NOTE: Registration of endpoints here 👇
 """
 
 from company.apis.api_v1 import router as company_router
+from quiz.apis.api_v1 import router as quiz_router
 
 api_v1.add_router("company/", company_router, tags=["Company"])
+api_v1.add_router("quiz/", quiz_router, tags=["Quiz"])
 
 """
 NOTE: Registration of endpoints here 👆
