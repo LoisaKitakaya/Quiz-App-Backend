@@ -18,6 +18,8 @@ class QuestionSchema(Schema):
     rating_max: Optional[int] = None
     next_index: Optional[int] = None
     previous_index: Optional[int] = None
+    has_next: bool
+    has_previous: bool
 
 
 class QuizSchema(ModelSchema):
@@ -27,3 +29,12 @@ class QuizSchema(ModelSchema):
             "created_at",
             "updated_at",
         ]
+
+
+class AnswerInputSchema(Schema):
+    username: str
+    question_id: str
+    selected_option: Optional[str] = None
+    rating: Optional[int] = None
+    text: Optional[str] = None
+    choice: Optional[bool] = None

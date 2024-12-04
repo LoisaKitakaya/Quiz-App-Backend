@@ -149,6 +149,11 @@ class Answer(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Answer"
         verbose_name_plural = "Answers"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["question", "user"], name="unique_user_answer"
+            )
+        ]
 
     def __str__(self):
         return f"Answer to '{self.question.text}' by {self.user}"
@@ -160,10 +165,19 @@ class Answer(models.Model):
             Question.OPEN_ENDED: hasattr(self, "open_ended"),
             Question.YES_NO: hasattr(self, "yes_no"),
         }
+
         if not valid_types.get(self.question.question_type, False):
             raise ValidationError(
                 f"Invalid answer type for question: {self.question.text}"
             )
+
+        if self.answer.question.question_type == Question.RATING_SCALE:
+            if not (
+                self.answer.question.rating_min
+                <= self.rating
+                <= self.answer.question.rating_max
+            ):
+                raise ValidationError("Invalid rating value")
 
 
 class MultipleChoiceAnswer(models.Model):
