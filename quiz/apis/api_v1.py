@@ -4,7 +4,14 @@ from ninja import Router
 from users.models import User
 from ninja.errors import HttpError
 from django.http import HttpResponse
-from .schema_v1 import QuestionSchema, QuizSchema, AnswerInputSchema
+from django.shortcuts import get_object_or_404
+from .schema_v1 import (
+    QuizSchema,
+    QuestionSchema,
+    AnswerInputSchema,
+    QuizResponseSchema,
+    UserQuizInputSchema,
+)
 from ..models import (
     Quiz,
     Answer,
@@ -147,7 +154,7 @@ def save_yes_no_answer(answer: Answer, choice: bool):
 def submit_answer(request, data: AnswerInputSchema):
     try:
         question_id = uuid.UUID(data.question_id)
-        
+
         selected_option = (
             uuid.UUID(data.selected_option) if data.selected_option else None
         )
@@ -171,6 +178,69 @@ def submit_answer(request, data: AnswerInputSchema):
             save_yes_no_answer(answer, data.choice)
 
         return HttpResponse("Ok", status=200)
+
+    except Exception as e:
+        raise HttpError(500, str(e))
+
+
+@router.post(
+    "/fetch-quiz-responses",
+    response=QuizResponseSchema,
+    description="Fetch all questions and answers for a user in a specific quiz.",
+)
+def fetch_quiz_responses(request, data: UserQuizInputSchema):
+    try:
+        user = get_object_or_404(User, username=data.username)
+        quiz = get_object_or_404(Quiz, id=data.quiz_id)
+
+        questions = Question.objects.filter(quiz=quiz)
+
+        response_data = {
+            "quiz_id": quiz.id,
+            "quiz_title": quiz.title,
+            "questions": [],
+        }
+
+        for question in questions:
+            answer = Answer.objects.filter(question=question, user=user).first()
+
+            user_answer = None
+
+            if answer:
+                if question.question_type == Question.MULTIPLE_CHOICE:
+                    multiple_choice_answer = MultipleChoiceAnswer.objects.filter(
+                        answer=answer
+                    ).first()
+                    if multiple_choice_answer:
+                        user_answer = [multiple_choice_answer.selected_option.id]
+                elif question.question_type == Question.RATING_SCALE:
+                    rating_scale_answer = RatingScaleAnswer.objects.filter(
+                        answer=answer
+                    ).first()
+                    user_answer = (
+                        rating_scale_answer.rating if rating_scale_answer else None
+                    )
+                elif question.question_type == Question.OPEN_ENDED:
+                    open_ended_answer = OpenEndedAnswer.objects.filter(
+                        answer=answer
+                    ).first()
+                    user_answer = (
+                        open_ended_answer.response if open_ended_answer else None
+                    )
+                elif question.question_type == Question.YES_NO:
+                    yes_no_answer = YesNoAnswer.objects.filter(answer=answer).first()
+                    user_answer = yes_no_answer.response if yes_no_answer else None
+
+            response_data["questions"].append(
+                {
+                    "question_id": question.id,
+                    "question_text": question.text,
+                    "question_type": question.get_question_type_display(),
+                    "answer": user_answer,
+                }
+            )
+
+        return response_data
 
     except Exception as e:
         raise HttpError(500, str(e))
