@@ -3,7 +3,6 @@ from typing import List
 from ninja import Router
 from users.models import User
 from ninja.errors import HttpError
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from .schema_v1 import (
     QuizSchema,
@@ -148,7 +147,7 @@ def save_yes_no_answer(answer: Answer, choice: bool):
 
 @router.post(
     "/submit-answer",
-    # response=HttpResponse,
+    response=dict,
     description="Submit an answer",
 )
 def submit_answer(request, data: AnswerInputSchema):
@@ -162,6 +161,9 @@ def submit_answer(request, data: AnswerInputSchema):
         user = User.objects.get(username=data.username)
 
         question = Question.objects.get(id=question_id)
+
+        if Answer.objects.filter(question=question, user=user).exists():
+            Answer.objects.filter(question=question, user=user).first().delete()
 
         answer = Answer.objects.create(
             question=question,
@@ -177,7 +179,7 @@ def submit_answer(request, data: AnswerInputSchema):
         elif question.question_type == Question.YES_NO:
             save_yes_no_answer(answer, data.choice)
 
-        return HttpResponse("Ok", status=200)
+        return {"message": "Answer submitted successfully"}
 
     except Exception as e:
         raise HttpError(500, str(e))
