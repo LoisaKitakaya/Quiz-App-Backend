@@ -1,14 +1,16 @@
 import uuid
+import json
 from typing import List
 from ninja import Router
 from users.models import User
+from utils.ai import ai_analysis
 from ninja.errors import HttpError
+from ai.models import ModelAnalysisResult
 from django.shortcuts import get_object_or_404
 from .schema_v1 import (
     QuizSchema,
     QuestionSchema,
     AnswerInputSchema,
-    QuizResponseSchema,
     UserQuizInputSchema,
 )
 from ..models import (
@@ -186,11 +188,11 @@ def submit_answer(request, data: AnswerInputSchema):
 
 
 @router.post(
-    "/fetch-quiz-responses",
-    response=QuizResponseSchema,
-    description="Fetch all questions and answers for a user in a specific quiz.",
+    "/quiz-ai-analysis",
+    response=dict,
+    description="Fetch all questions and answers for a user in a specific quiz and get AI analysis o",
 )
-def fetch_quiz_responses(request, data: UserQuizInputSchema):
+def quiz_ai_analysis(request, data: UserQuizInputSchema):
     try:
         user = get_object_or_404(User, username=data.username)
         quiz = get_object_or_404(Quiz, id=data.quiz_id)
@@ -214,7 +216,7 @@ def fetch_quiz_responses(request, data: UserQuizInputSchema):
                         answer=answer
                     ).first()
                     if multiple_choice_answer:
-                        user_answer = [multiple_choice_answer.selected_option.id]
+                        user_answer = [multiple_choice_answer.selected_option.text]
                 elif question.question_type == Question.RATING_SCALE:
                     rating_scale_answer = RatingScaleAnswer.objects.filter(
                         answer=answer
@@ -242,7 +244,29 @@ def fetch_quiz_responses(request, data: UserQuizInputSchema):
                 }
             )
 
-        return response_data
+        analysis = json.loads(ai_analysis(response_data, user))
 
+        ModelAnalysisResult.objects.filter(user=user, quiz=quiz).delete()
+
+        ModelAnalysisResult.objects.create(user=user, quiz=quiz, analysis=analysis)
+
+        return {"message": "AI analysis completed successfully"}
+
+    except Exception as e:
+        raise HttpError(500, str(e))
+
+
+@router.get(
+    "fetch-quiz-analysis",
+    response=dict,
+    description="Fetch the analysis saved in the database",
+)
+def fetch_quiz_analysis(request, username: str = "", quiz_id: str = ""):
+    try:
+        saved_data = ModelAnalysisResult.objects.get(
+            user__username=username, quiz__id=uuid.UUID(quiz_id)
+        )
+
+        return saved_data.analysis
     except Exception as e:
         raise HttpError(500, str(e))

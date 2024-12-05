@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     # my apps
     "users",
     "quiz",
+    "ai",
 ]
 
 MIDDLEWARE = [
@@ -181,3 +182,7 @@ ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 BACKEND_URL = os.getenv("BACKEND_URL")
+
+# OpenAI Configuration
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

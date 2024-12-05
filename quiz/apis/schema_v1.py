@@ -44,7 +44,7 @@ class AnswerSchema(Schema):
     question_id: uuid.UUID
     question_text: str
     question_type: str
-    answer: Union[None, str, int, bool, List[uuid.UUID]]
+    answer: Union[None, str, int, bool, List[str]]
 
 
 class QuizResponseSchema(Schema):
