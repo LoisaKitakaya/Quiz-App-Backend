@@ -188,11 +188,11 @@ def submit_answer(request, data: AnswerInputSchema):
 
 
 @router.post(
-    "/fetch-quiz-analysis",
+    "/quiz-ai-analysis",
     response=dict,
     description="Fetch all questions and answers for a user in a specific quiz and get AI analysis o",
 )
-def fetch_quiz_responses(request, data: UserQuizInputSchema):
+def quiz_ai_analysis(request, data: UserQuizInputSchema):
     try:
         user = get_object_or_404(User, username=data.username)
         quiz = get_object_or_404(Quiz, id=data.quiz_id)
@@ -252,5 +252,21 @@ def fetch_quiz_responses(request, data: UserQuizInputSchema):
 
         return {"message": "AI analysis completed successfully"}
 
+    except Exception as e:
+        raise HttpError(500, str(e))
+
+
+@router.get(
+    "fetch-quiz-analysis",
+    response=dict,
+    description="Fetch the analysis saved in the database",
+)
+def fetch_quiz_analysis(request, username: str = "", quiz_id: str = ""):
+    try:
+        saved_data = ModelAnalysisResult.objects.get(
+            user__username=username, quiz__id=uuid.UUID(quiz_id)
+        )
+
+        return saved_data.analysis
     except Exception as e:
         raise HttpError(500, str(e))
