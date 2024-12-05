@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from quiz.models import Quiz
 from users.models import User
 from django.core.serializers.json import DjangoJSONEncoder
 
@@ -14,6 +15,11 @@ class ModelAnalysisResult(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name="user_analysis",
+    )
+    quiz = models.ForeignKey(
+        Quiz,
+        on_delete=models.CASCADE,
+        related_name="quiz_analysis",
     )
     analysis = models.JSONField(
         encoder=DjangoJSONEncoder,

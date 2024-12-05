@@ -29,7 +29,7 @@ def ai_analysis(quiz_results: QuizResponseSchema, user: User):
     formatted_user_profile = json.dumps(user_data, indent=2)
 
     json_structure = {
-        "type": "object",  # Define the root type
+        "type": "object",
         "properties": {
             "user_profile": {
                 "type": "object",

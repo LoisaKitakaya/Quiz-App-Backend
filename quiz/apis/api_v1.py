@@ -246,7 +246,9 @@ def fetch_quiz_responses(request, data: UserQuizInputSchema):
 
         analysis = json.loads(ai_analysis(response_data, user))
 
-        ModelAnalysisResult.objects.create(user=user, analysis=analysis)
+        ModelAnalysisResult.objects.filter(user=user, quiz=quiz).delete()
+
+        ModelAnalysisResult.objects.create(user=user, quiz=quiz, analysis=analysis)
 
         return {"message": "AI analysis completed successfully"}
 
