@@ -11,7 +11,7 @@ class OptionSchema(Schema):
 
 class QuestionSchema(Schema):
     id: uuid.UUID
-    text: str
+    question: str
     question_type: str
     options: Optional[list[OptionSchema]] = None
     next_index: Optional[int] = None

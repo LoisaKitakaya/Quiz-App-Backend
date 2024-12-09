@@ -85,7 +85,7 @@ def get_question(request, quiz_id: str, question_index: int = 0):
 
         return {
             "id": question.id,
-            "text": question.text,
+            "question": question.question,
             "question_type": question.question_type,
             "options": options,
             "next_index": next_index,
