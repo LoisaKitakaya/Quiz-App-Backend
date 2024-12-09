@@ -19,8 +19,8 @@ from quiz.apis.api_v1 import router as quiz_router
 from users.apis.api_v1 import router as users_router
 
 api_v1.add_router("company/", company_router, tags=["Company"])
-api_v1.add_router("quiz/", quiz_router, tags=["Quiz"])
 api_v1.add_router("users/", users_router, tags=["Users"])
+api_v1.add_router("quiz/", quiz_router, tags=["Quiz"])
 
 """
 NOTE: Registration of endpoints here 👆
