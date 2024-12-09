@@ -36,7 +36,7 @@ router = Router()
 )
 def get_quiz(request):
     try:
-        return Quiz.objects.filter(is_active=True).first()
+        return Quiz.objects.all().first()
     except Exception as e:
         raise HttpError(500, str(e))
 
