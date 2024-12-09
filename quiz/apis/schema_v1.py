@@ -14,8 +14,6 @@ class QuestionSchema(Schema):
     text: str
     question_type: str
     options: Optional[list[OptionSchema]] = None
-    rating_min: Optional[int] = None
-    rating_max: Optional[int] = None
     next_index: Optional[int] = None
     previous_index: Optional[int] = None
     has_next: bool
@@ -34,17 +32,15 @@ class QuizSchema(ModelSchema):
 class AnswerInputSchema(Schema):
     username: str
     question_id: str
-    selected_option: Optional[str] = None
-    rating: Optional[int] = None
+    selected_option: Optional[Union[str, List[str]]] = None
     text: Optional[str] = None
-    choice: Optional[bool] = None
 
 
 class AnswerSchema(Schema):
     question_id: uuid.UUID
     question_text: str
     question_type: str
-    answer: Union[None, str, int, bool, List[str]]
+    answer: Union[None, str, int, List[str]]
 
 
 class QuizResponseSchema(Schema):
