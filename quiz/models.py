@@ -4,23 +4,6 @@ from users.models import User
 from django.core.exceptions import ValidationError
 
 
-class Category(models.Model):
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-    )
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-
-    class Meta:
-        verbose_name = "Category"
-        verbose_name_plural = "Categories"
-
-    def __str__(self):
-        return self.name
-
-
 class Quiz(models.Model):
     id = models.UUIDField(
         primary_key=True,
@@ -29,8 +12,6 @@ class Quiz(models.Model):
     )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -44,16 +25,14 @@ class Quiz(models.Model):
 
 
 class Question(models.Model):
-    MULTIPLE_CHOICE = "multiple_choice"
-    RATING_SCALE = "rating_scale"
+    MULTIPLE_CHOICE = "multiple_choice"  # Render checkbox in frontend
+    SINGLE_CHOICE = "single_choice"  # Render radiobox in frontend
     OPEN_ENDED = "open_ended"
-    YES_NO = "yes_no"
 
     QUESTION_TYPES = (
-        (MULTIPLE_CHOICE, "Multiple Choice"),
-        (RATING_SCALE, "Rating Scale"),
+        (MULTIPLE_CHOICE, "Multiple Choice"),  # Render checkbox in frontend
+        (SINGLE_CHOICE, "Single Choice"),  # Render radiobox in frontend
         (OPEN_ENDED, "Open-Ended"),
-        (YES_NO, "Yes/No"),
     )
 
     id = models.UUIDField(
@@ -66,21 +45,11 @@ class Question(models.Model):
         on_delete=models.CASCADE,
         related_name="questions",
     )
-    text = models.TextField()
+    question = models.TextField()
     question_type = models.CharField(
         max_length=20,
         choices=QUESTION_TYPES,
         default=MULTIPLE_CHOICE,
-    )
-    rating_min = models.IntegerField(
-        blank=True,
-        null=True,
-        help_text="Minimum value for rating scale questions (e.g., 1 for Strongly Disagree)",
-    )
-    rating_max = models.IntegerField(
-        blank=True,
-        null=True,
-        help_text="Maximum value for rating scale questions (e.g., 5 for Strongly Agree)",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -91,15 +60,7 @@ class Question(models.Model):
         verbose_name_plural = "Questions"
 
     def __str__(self):
-        return self.text
-
-    def clean(self):
-        if self.question_type == Question.RATING_SCALE and (
-            self.rating_min is None or self.rating_max is None
-        ):
-            raise ValidationError(
-                "Rating scale questions must have rating_min and rating_max defined."
-            )
+        return self.question
 
 
 class MultipleChoiceOption(models.Model):
@@ -111,10 +72,10 @@ class MultipleChoiceOption(models.Model):
     question = models.ForeignKey(
         Question,
         on_delete=models.CASCADE,
-        related_name="options",
+        related_name="multiple_choice_options",
         limit_choices_to={"question_type": Question.MULTIPLE_CHOICE},
     )
-    text = models.TextField()
+    option = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -124,7 +85,32 @@ class MultipleChoiceOption(models.Model):
         verbose_name_plural = "Multiple Choice Options"
 
     def __str__(self):
-        return f"{self.text}"
+        return f"{self.option}"
+
+
+class SingleChoiceOption(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    question = models.ForeignKey(
+        Question,
+        on_delete=models.CASCADE,
+        related_name="single_choice_options",
+        limit_choices_to={"question_type": Question.SINGLE_CHOICE},
+    )
+    option = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Single Choice Option"
+        verbose_name_plural = "Single Choice Options"
+
+    def __str__(self):
+        return f"{self.option}"
 
 
 class Answer(models.Model):
@@ -141,7 +127,7 @@ class Answer(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="answers",
+        related_name="user_answers",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -154,30 +140,35 @@ class Answer(models.Model):
                 fields=["question", "user"], name="unique_user_answer"
             )
         ]
+        indexes = [
+            models.Index(fields=["question", "user"]),
+        ]
 
     def __str__(self):
-        return f"Answer to '{self.question.text}' by {self.user}"
+        return f"Answer to '{self.question.question}' by {self.user}"
 
     def clean(self):
         valid_types = {
             Question.MULTIPLE_CHOICE: hasattr(self, "multiple_choice"),
-            Question.RATING_SCALE: hasattr(self, "rating_scale"),
+            Question.SINGLE_CHOICE: hasattr(self, "single_choice"),
             Question.OPEN_ENDED: hasattr(self, "open_ended"),
-            Question.YES_NO: hasattr(self, "yes_no"),
         }
 
         if not valid_types.get(self.question.question_type, False):
             raise ValidationError(
-                f"Invalid answer type for question: {self.question.text}"
+                f"Invalid answer type for question: {self.question.question}"
             )
 
-        if self.answer.question.question_type == Question.RATING_SCALE:
-            if not (
-                self.answer.question.rating_min
-                <= self.rating
-                <= self.answer.question.rating_max
-            ):
-                raise ValidationError("Invalid rating value")
+        answer_types = {
+            Question.MULTIPLE_CHOICE: self.multiple_choice,
+            Question.SINGLE_CHOICE: self.single_choice,
+            Question.OPEN_ENDED: self.open_ended,
+        }
+
+        if not answer_types.get(self.question.question_type):
+            raise ValidationError(
+                f"Invalid answer type for question: {self.question.question}"
+            )
 
 
 class MultipleChoiceAnswer(models.Model):
@@ -189,11 +180,11 @@ class MultipleChoiceAnswer(models.Model):
     answer = models.OneToOneField(
         Answer,
         on_delete=models.CASCADE,
-        related_name="multiple_choice",
+        related_name="multiple_choice_answer",
     )
-    selected_option = models.ForeignKey(
+    selected_option = models.ManyToManyField(
         MultipleChoiceOption,
-        on_delete=models.CASCADE,
+        blank=True,
     )
 
     class Meta:
@@ -201,14 +192,14 @@ class MultipleChoiceAnswer(models.Model):
         verbose_name_plural = "Multiple Choice Answers"
 
     def __str__(self):
-        return f"Multiple Choice Answer: {self.selected_option.text}"
+        return f"Multiple Choice Answer: {self.selected_option}"
 
     def clean(self):
         if self.answer.question.question_type != Question.MULTIPLE_CHOICE:
             raise ValidationError("Invalid question type for Multiple Choice Answer.")
 
 
-class RatingScaleAnswer(models.Model):
+class SingleChoiceAnswer(models.Model):
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -217,27 +208,23 @@ class RatingScaleAnswer(models.Model):
     answer = models.OneToOneField(
         Answer,
         on_delete=models.CASCADE,
-        related_name="rating_scale",
+        related_name="single_choice_answer",
     )
-    rating = models.IntegerField()
+    selected_option = models.ForeignKey(
+        SingleChoiceOption,
+        on_delete=models.CASCADE,
+    )
 
     class Meta:
-        verbose_name = "Rating Scale Answer"
-        verbose_name_plural = "Rating Scale Answers"
+        verbose_name = "Single Choice Answer"
+        verbose_name_plural = "Single Choice Answers"
 
     def __str__(self):
-        return f"Rating: {self.rating}"
+        return f"Single Choice Answer: {self.selected_option.question}"
 
     def clean(self):
-        if self.answer.question.question_type != Question.RATING_SCALE:
-            raise ValidationError("Invalid question type for Rating Scale Answer.")
-
-        if not (
-            self.answer.question.rating_min
-            <= self.rating
-            <= self.answer.question.rating_max
-        ):
-            raise ValidationError("Rating must be within the question's defined range.")
+        if self.answer.question.question_type != Question.SINGLE_CHOICE:
+            raise ValidationError("Invalid question type for Single Choice Answer.")
 
 
 class OpenEndedAnswer(models.Model):
@@ -249,7 +236,7 @@ class OpenEndedAnswer(models.Model):
     answer = models.OneToOneField(
         Answer,
         on_delete=models.CASCADE,
-        related_name="open_ended",
+        related_name="open_ended_answer",
     )
     response = models.TextField()
 
@@ -263,28 +250,3 @@ class OpenEndedAnswer(models.Model):
     def clean(self):
         if self.answer.question.question_type != Question.OPEN_ENDED:
             raise ValidationError("Invalid question type for Open Ended Answer.")
-
-
-class YesNoAnswer(models.Model):
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-    )
-    answer = models.OneToOneField(
-        Answer,
-        on_delete=models.CASCADE,
-        related_name="yes_no",
-    )
-    response = models.BooleanField()
-
-    class Meta:
-        verbose_name = "Yes/No Answer"
-        verbose_name_plural = "Yes/No Answers"
-
-    def __str__(self):
-        return f"Yes/No Answer: {'Yes' if self.response else 'No'}"
-
-    def clean(self):
-        if self.answer.question.question_type != Question.YES_NO:
-            raise ValidationError("Invalid question type for Yes/No Answer.")

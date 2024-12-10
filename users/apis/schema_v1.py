@@ -17,26 +17,14 @@ class UserSchema(ModelSchema):
         ]
 
 
-class UserInputSchema(Schema):
+class ProfileInputSchema(Schema):
     first_name: str
     last_name: str
     username: str
+    email: str
+
+
+class CompleteProfileInputSchema(Schema):
     email: str
     password: str
     confirm_password: str
-
-
-class UserUpdateSchema(Schema):
-    first_name: str
-    last_name: str
-    username: str
-    email: str
-
-
-class UserPasswordResetSchema(Schema):
-    email: str
-
-
-class LoginUserSchema(Schema):
-    username: str
-    password: str

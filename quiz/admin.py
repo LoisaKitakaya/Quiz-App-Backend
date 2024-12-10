@@ -1,42 +1,44 @@
 from django.contrib import admin
 from .models import (
-    Category,
     Quiz,
     Question,
     MultipleChoiceOption,
+    SingleChoiceOption,
     Answer,
     MultipleChoiceAnswer,
-    RatingScaleAnswer,
+    SingleChoiceAnswer,
     OpenEndedAnswer,
-    YesNoAnswer,
 )
-
-
-@admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "description")
-    search_fields = ("name",)
 
 
 @admin.register(Quiz)
 class QuizAdmin(admin.ModelAdmin):
-    list_display = ("title", "category", "is_active", "created_at")
-    list_filter = ("is_active", "category")
+    list_display = ("title", "description", "created_at", "updated_at")
     search_fields = ("title", "description")
+    list_filter = ("created_at", "updated_at")
+    ordering = ("-created_at",)
 
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ("text", "quiz", "question_type", "created_at")
+    list_display = ("question", "quiz", "question_type", "created_at")
     list_filter = ("question_type", "quiz")
-    search_fields = ("text",)
+    search_fields = ("question",)
     ordering = ("-created_at",)
 
 
 @admin.register(MultipleChoiceOption)
 class MultipleChoiceOptionAdmin(admin.ModelAdmin):
-    list_display = ("text", "question", "created_at")
-    search_fields = ("text",)
+    list_display = ("option", "question", "created_at")
+    search_fields = ("option", "question__question")
+    list_filter = ("question__quiz",)
+    ordering = ("-created_at",)
+
+
+@admin.register(SingleChoiceOption)
+class SingleChoiceOptionAdmin(admin.ModelAdmin):
+    list_display = ("option", "question", "created_at")
+    search_fields = ("option", "question__question")
     list_filter = ("question__quiz",)
     ordering = ("-created_at",)
 
@@ -45,35 +47,36 @@ class MultipleChoiceOptionAdmin(admin.ModelAdmin):
 class AnswerAdmin(admin.ModelAdmin):
     list_display = ("question", "user", "created_at")
     search_fields = (
-        "question__text",
+        "question__question",
         "user__username",
-    )  # Replace `username` with the User model's identifier field
+    )  # Adjust 'username' to match your User model
     list_filter = ("question__quiz",)
+    ordering = ("-created_at",)
 
 
 @admin.register(MultipleChoiceAnswer)
 class MultipleChoiceAnswerAdmin(admin.ModelAdmin):
-    list_display = ("answer", "selected_option")
-    search_fields = ("answer__question__text", "selected_option__text")
+    list_display = ("answer",)
+    search_fields = (
+        "answer__question__question",
+        "answer__user__username",
+    )  # Adjust 'username' to match your User model
     list_filter = ("answer__question__quiz",)
 
 
-@admin.register(RatingScaleAnswer)
-class RatingScaleAnswerAdmin(admin.ModelAdmin):
-    list_display = ("answer", "rating")
-    search_fields = ("answer__question__text",)
+@admin.register(SingleChoiceAnswer)
+class SingleChoiceAnswerAdmin(admin.ModelAdmin):
+    list_display = ("answer", "selected_option")
+    search_fields = (
+        "answer__question__question",
+        "selected_option__option",
+        "answer__user__username",
+    )
     list_filter = ("answer__question__quiz",)
 
 
 @admin.register(OpenEndedAnswer)
 class OpenEndedAnswerAdmin(admin.ModelAdmin):
     list_display = ("answer", "response")
-    search_fields = ("answer__question__text", "response")
-    list_filter = ("answer__question__quiz",)
-
-
-@admin.register(YesNoAnswer)
-class YesNoAnswerAdmin(admin.ModelAdmin):
-    list_display = ("answer", "response")
-    search_fields = ("answer__question__text",)
+    search_fields = ("answer__question__question", "response", "answer__user__username")
     list_filter = ("answer__question__quiz",)

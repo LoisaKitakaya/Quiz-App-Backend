@@ -4,9 +4,11 @@ from typing import List
 from ninja import Router
 from users.models import User
 from utils.ai import ai_analysis
+from django.db import transaction
 from ninja.errors import HttpError
 from ai.models import ModelAnalysisResult
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError
 from .schema_v1 import (
     QuizSchema,
     QuestionSchema,
@@ -17,14 +19,26 @@ from ..models import (
     Quiz,
     Answer,
     Question,
-    YesNoAnswer,
     OpenEndedAnswer,
-    RatingScaleAnswer,
+    SingleChoiceAnswer,
+    SingleChoiceOption,
     MultipleChoiceAnswer,
     MultipleChoiceOption,
 )
 
 router = Router()
+
+
+@router.get(
+    "",
+    response=QuizSchema,
+    description="Fetch main quiz.",
+)
+def get_quiz(request):
+    try:
+        return Quiz.objects.all().first()
+    except Exception as e:
+        raise HttpError(500, str(e))
 
 
 @router.get(
@@ -41,29 +55,24 @@ def get_question(request, quiz_id: str, question_index: int = 0):
         if question_index > questions_count or question_index < 0:
             raise HttpError(404, "No more questions")
 
-        question = Question.objects.filter(
-            quiz__id=quiz_id, quiz__is_active=True
-        ).order_by("id")[question_index]
+        question = Question.objects.filter(quiz__id=quiz_id).order_by("id")[
+            question_index
+        ]
 
         options = (
             [
-                {"id": option.id, "text": option.text}
+                {"id": option.id, "option": option.option}
                 for option in MultipleChoiceOption.objects.filter(question=question)
             ]
-            if question.question_type == "multiple_choice"
-            else None
-        )
-
-        rating_min = (
-            question.rating_min
-            if question.question_type == Question.RATING_SCALE
-            else None
-        )
-
-        rating_max = (
-            question.rating_max
-            if question.question_type == Question.RATING_SCALE
-            else None
+            if question.question_type == Question.MULTIPLE_CHOICE
+            else (
+                [
+                    {"id": option.id, "option": option.option}
+                    for option in SingleChoiceOption.objects.filter(question=question)
+                ]
+                if question.question_type == Question.SINGLE_CHOICE
+                else None
+            )
         )
 
         next_index = (
@@ -76,11 +85,9 @@ def get_question(request, quiz_id: str, question_index: int = 0):
 
         return {
             "id": question.id,
-            "text": question.text,
+            "question": question.question,
             "question_type": question.question_type,
             "options": options,
-            "rating_min": rating_min,
-            "rating_max": rating_max,
             "next_index": next_index,
             "previous_index": previous_index,
             "has_next": has_next,
@@ -93,36 +100,42 @@ def get_question(request, quiz_id: str, question_index: int = 0):
         raise HttpError(500, str(e))
 
 
-@router.get(
-    "",
-    response=List[QuizSchema],
-    description="Fetch all available quizzes.",
-)
-def get_quizzes(request):
+def save_multiple_choice_answer(answer: Answer, selected_option: List[uuid.UUID]):
     try:
-        return list(Quiz.objects.filter(is_active=True))
+        question = answer.question
+
+        options = MultipleChoiceOption.objects.filter(id__in=selected_option)
+
+        for option in options:
+            if option.question != question:
+                raise ValidationError(
+                    f"Option {option.id} does not belong to question {question.id}."
+                )
+
+        with transaction.atomic():
+            multiple_choice_answer = MultipleChoiceAnswer.objects.create(
+                answer=answer,
+            )
+            multiple_choice_answer.selected_option.add(*options)
+
     except Exception as e:
         raise HttpError(500, str(e))
 
 
-def save_multiple_choice_answer(answer: Answer, selected_option: uuid.UUID):
+def save_single_choice_answer(answer: Answer, selected_option: uuid.UUID):
     try:
-        multiple_choice_option = MultipleChoiceOption.objects.get(id=selected_option)
+        single_choice_option = SingleChoiceOption.objects.get(id=selected_option)
 
-        MultipleChoiceAnswer.objects.create(
-            answer=answer,
-            selected_option=multiple_choice_option,
-        )
-    except Exception as e:
-        raise HttpError(500, str(e))
+        if single_choice_option.question != answer.question:
+            raise ValidationError(
+                f"Option {single_choice_option.id} does not belong to question {answer.question.id}."
+            )
 
-
-def save_rating_scale_answer(answer: Answer, rating: int):
-    try:
-        RatingScaleAnswer.objects.create(
-            answer=answer,
-            rating=rating,
-        )
+        with transaction.atomic():
+            SingleChoiceAnswer.objects.create(
+                answer=answer,
+                selected_option=single_choice_option,
+            )
     except Exception as e:
         raise HttpError(500, str(e))
 
@@ -137,49 +150,67 @@ def save_open_ended_answer(answer: Answer, text: str):
         raise HttpError(500, str(e))
 
 
-def save_yes_no_answer(answer: Answer, choice: bool):
-    try:
-        YesNoAnswer.objects.create(
-            answer=answer,
-            response=choice,
-        )
-    except Exception as e:
-        raise HttpError(500, str(e))
-
-
 @router.post(
     "/submit-answer",
     response=dict,
     description="Submit an answer",
 )
-def submit_answer(request, data: AnswerInputSchema):
+def submit_answer(request, data: List[AnswerInputSchema]):
+    print("Data: ", data)
+    
     try:
-        question_id = uuid.UUID(data.question_id)
+        # with transaction.atomic():
+        for answer_data in data:
+            question_id = uuid.UUID(answer_data.question_id)
 
-        selected_option = (
-            uuid.UUID(data.selected_option) if data.selected_option else None
-        )
+            question = Question.objects.get(id=question_id)
+            user = User.objects.get(username=answer_data.username)
 
-        user = User.objects.get(username=data.username)
+            if answer_data.selected_option:
+                if isinstance(answer_data.selected_option, str):
+                    selected_option = uuid.UUID(answer_data.selected_option)
+                elif isinstance(answer_data.selected_option, list):
+                    selected_option = [
+                        uuid.UUID(option) for option in answer_data.selected_option
+                    ]
+                else:
+                    raise ValueError(
+                        "Invalid format for selected_option. Must be a string or a list of strings."
+                    )
+            else:
+                selected_option = None
 
-        question = Question.objects.get(id=question_id)
+            existing_answer = Answer.objects.filter(
+                question=question, user=user
+            ).first()
 
-        if Answer.objects.filter(question=question, user=user).exists():
-            Answer.objects.filter(question=question, user=user).first().delete()
+            if existing_answer:
+                existing_answer.delete()
 
-        answer = Answer.objects.create(
-            question=question,
-            user=user,
-        )
+            answer = Answer.objects.create(
+                question=question,
+                user=user,
+            )
 
-        if question.question_type == Question.MULTIPLE_CHOICE:
-            save_multiple_choice_answer(answer, selected_option)
-        elif question.question_type == Question.RATING_SCALE:
-            save_rating_scale_answer(answer, data.rating)
-        elif question.question_type == Question.OPEN_ENDED:
-            save_open_ended_answer(answer, data.text)
-        elif question.question_type == Question.YES_NO:
-            save_yes_no_answer(answer, data.choice)
+            if question.question_type == Question.MULTIPLE_CHOICE:
+                if not isinstance(selected_option, list):
+                    raise ValueError(
+                        "Multiple choice answers require a list of selected options."
+                    )
+
+                save_multiple_choice_answer(answer, selected_option)
+            elif question.question_type == Question.SINGLE_CHOICE:
+                if not isinstance(selected_option, uuid.UUID):
+                    raise ValueError(
+                        "Single choice answers require a single selected option."
+                    )
+
+                save_single_choice_answer(answer, selected_option)
+            elif question.question_type == Question.OPEN_ENDED:
+                if not answer_data.text:
+                    raise ValueError("Open-ended answers require text.")
+
+                save_open_ended_answer(answer, answer_data.text)
 
         return {"message": "Answer submitted successfully"}
 
@@ -197,7 +228,12 @@ def quiz_ai_analysis(request, data: UserQuizInputSchema):
         user = get_object_or_404(User, username=data.username)
         quiz = get_object_or_404(Quiz, id=data.quiz_id)
 
-        questions = Question.objects.filter(quiz=quiz)
+        questions = Question.objects.filter(quiz=quiz).prefetch_related(
+            "answers",
+            "answers__multiple_choice_answer__selected_option",
+            "answers__single_choice_answer__selected_option",
+            "answers__open_ended_answer",
+        )
 
         response_data = {
             "quiz_id": quiz.id,
@@ -206,39 +242,36 @@ def quiz_ai_analysis(request, data: UserQuizInputSchema):
         }
 
         for question in questions:
-            answer = Answer.objects.filter(question=question, user=user).first()
-
+            answer = question.answers.filter(user=user).first()
             user_answer = None
 
             if answer:
                 if question.question_type == Question.MULTIPLE_CHOICE:
-                    multiple_choice_answer = MultipleChoiceAnswer.objects.filter(
-                        answer=answer
-                    ).first()
+                    multiple_choice_answer = getattr(
+                        answer, "multiple_choice_answer", None
+                    )
                     if multiple_choice_answer:
-                        user_answer = [multiple_choice_answer.selected_option.text]
-                elif question.question_type == Question.RATING_SCALE:
-                    rating_scale_answer = RatingScaleAnswer.objects.filter(
-                        answer=answer
-                    ).first()
+                        user_answer = [
+                            option.option
+                            for option in multiple_choice_answer.selected_option.all()
+                        ]
+                elif question.question_type == Question.SINGLE_CHOICE:
+                    single_choice_answer = getattr(answer, "single_choice_answer", None)
                     user_answer = (
-                        rating_scale_answer.rating if rating_scale_answer else None
+                        single_choice_answer.selected_option.option
+                        if single_choice_answer
+                        else None
                     )
                 elif question.question_type == Question.OPEN_ENDED:
-                    open_ended_answer = OpenEndedAnswer.objects.filter(
-                        answer=answer
-                    ).first()
+                    open_ended_answer = getattr(answer, "open_ended_answer", None)
                     user_answer = (
                         open_ended_answer.response if open_ended_answer else None
                     )
-                elif question.question_type == Question.YES_NO:
-                    yes_no_answer = YesNoAnswer.objects.filter(answer=answer).first()
-                    user_answer = yes_no_answer.response if yes_no_answer else None
 
             response_data["questions"].append(
                 {
                     "question_id": question.id,
-                    "question_text": question.text,
+                    "question_text": question.question,
                     "question_type": question.get_question_type_display(),
                     "answer": user_answer,
                 }
