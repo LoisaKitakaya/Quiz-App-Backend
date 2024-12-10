@@ -6,7 +6,7 @@ from typing import Optional, Union, List
 
 class OptionSchema(Schema):
     id: uuid.UUID
-    text: str
+    option: str
 
 
 class QuestionSchema(Schema):

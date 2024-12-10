@@ -61,13 +61,13 @@ def get_question(request, quiz_id: str, question_index: int = 0):
 
         options = (
             [
-                {"id": option.id, "text": option.option}
+                {"id": option.id, "option": option.option}
                 for option in MultipleChoiceOption.objects.filter(question=question)
             ]
             if question.question_type == Question.MULTIPLE_CHOICE
             else (
                 [
-                    {"id": option.id, "text": option.option}
+                    {"id": option.id, "option": option.option}
                     for option in SingleChoiceOption.objects.filter(question=question)
                 ]
                 if question.question_type == Question.SINGLE_CHOICE
@@ -155,54 +155,62 @@ def save_open_ended_answer(answer: Answer, text: str):
     response=dict,
     description="Submit an answer",
 )
-def submit_answer(request, data: AnswerInputSchema):
+def submit_answer(request, data: List[AnswerInputSchema]):
+    print("Data: ", data)
+    
     try:
-        question_id = uuid.UUID(data.question_id)
+        # with transaction.atomic():
+        for answer_data in data:
+            question_id = uuid.UUID(answer_data.question_id)
 
-        question = Question.objects.get(id=question_id)
-        user = User.objects.get(username=data.username)
+            question = Question.objects.get(id=question_id)
+            user = User.objects.get(username=answer_data.username)
 
-        if data.selected_option:
-            if isinstance(data.selected_option, str):
-                selected_option = uuid.UUID(data.selected_option)
-            elif isinstance(data.selected_option, list):
-                selected_option = [uuid.UUID(option) for option in data.selected_option]
+            if answer_data.selected_option:
+                if isinstance(answer_data.selected_option, str):
+                    selected_option = uuid.UUID(answer_data.selected_option)
+                elif isinstance(answer_data.selected_option, list):
+                    selected_option = [
+                        uuid.UUID(option) for option in answer_data.selected_option
+                    ]
+                else:
+                    raise ValueError(
+                        "Invalid format for selected_option. Must be a string or a list of strings."
+                    )
             else:
-                raise ValueError(
-                    "Invalid format for selected_option. Must be a string or a list of strings."
-                )
-        else:
-            selected_option = None
+                selected_option = None
 
-        existing_answer = Answer.objects.filter(question=question, user=user).first()
+            existing_answer = Answer.objects.filter(
+                question=question, user=user
+            ).first()
 
-        if existing_answer:
-            existing_answer.delete()
+            if existing_answer:
+                existing_answer.delete()
 
-        answer = Answer.objects.create(
-            question=question,
-            user=user,
-        )
+            answer = Answer.objects.create(
+                question=question,
+                user=user,
+            )
 
-        if question.question_type == Question.MULTIPLE_CHOICE:
-            if not isinstance(selected_option, list):
-                raise ValueError(
-                    "Multiple choice answers require a list of selected options."
-                )
+            if question.question_type == Question.MULTIPLE_CHOICE:
+                if not isinstance(selected_option, list):
+                    raise ValueError(
+                        "Multiple choice answers require a list of selected options."
+                    )
 
-            save_multiple_choice_answer(answer, selected_option)
-        elif question.question_type == Question.SINGLE_CHOICE:
-            if not isinstance(selected_option, uuid.UUID):
-                raise ValueError(
-                    "Single choice answers require a single selected option."
-                )
+                save_multiple_choice_answer(answer, selected_option)
+            elif question.question_type == Question.SINGLE_CHOICE:
+                if not isinstance(selected_option, uuid.UUID):
+                    raise ValueError(
+                        "Single choice answers require a single selected option."
+                    )
 
-            save_single_choice_answer(answer, selected_option)
-        elif question.question_type == Question.OPEN_ENDED:
-            if not data.text:
-                raise ValueError("Open-ended answers require text.")
+                save_single_choice_answer(answer, selected_option)
+            elif question.question_type == Question.OPEN_ENDED:
+                if not answer_data.text:
+                    raise ValueError("Open-ended answers require text.")
 
-            save_open_ended_answer(answer, data.text)
+                save_open_ended_answer(answer, answer_data.text)
 
         return {"message": "Answer submitted successfully"}
 
@@ -263,7 +271,7 @@ def quiz_ai_analysis(request, data: UserQuizInputSchema):
             response_data["questions"].append(
                 {
                     "question_id": question.id,
-                    "question_text": question.text,
+                    "question_text": question.question,
                     "question_type": question.get_question_type_display(),
                     "answer": user_answer,
                 }
